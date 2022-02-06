@@ -24,6 +24,8 @@ import re
 # you may use urllib to encode data appropriately
 import urllib.parse
 
+from urllib3 import get_host
+
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
 
@@ -33,12 +35,32 @@ class HTTPResponse(object):
         self.body = body
 
 class HTTPClient(object):
-    #def get_host_port(self,url):
+    def get_host_port(self,url):
+        return urllib.parse.urlparse(url).port
+
+    def get_host(self,url):
+        return urllib.parse.urlparse(url).hostname
 
     def connect(self, host, port):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print('Creating socket')
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        except (socket.error, msg):
+            print(f'Failed to create socket. Error code: {str(msg[0])} , Error message : {msg[1]}')
+            sys.exit()
+        print('Socket created successfully')
+
+        print(f'Getting IP for {host}')
+        try:
+            remote_ip = socket.gethostbyname( host )
+        except socket.gaierror:
+            print ('Hostname could not be resolved. Exiting')
+            sys.exit()
+
+        print (f'Ip address of {host} is {remote_ip}')
+        
         self.socket.connect((host, port))
-        return None
+        print (f'Socket Connected to {host} on ip {remote_ip}')
 
     def get_code(self, data):
         return None
@@ -50,17 +72,25 @@ class HTTPClient(object):
         return None
     
     def sendall(self, data):
-        self.socket.sendall(data.encode('utf-8'))
+        print("Sending payload")    
+        try:
+            self.socket.sendall(data.encode('utf-8'))
+        except socket.error:
+            print ('Send failed')
+            sys.exit()
+        print("Payload sent successfully")
+
+        # self.socket.sendall(data.encode('utf-8'))
         
     def close(self):
         self.socket.close()
 
     # read everything from the socket
-    def recvall(self, sock):
+    def recvall(self):
         buffer = bytearray()
         done = False
         while not done:
-            part = sock.recv(1024)
+            part = self.socket.recv(1024)
             if (part):
                 buffer.extend(part)
             else:
@@ -68,6 +98,26 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
+        try:
+            port = self.get_host_port(url)
+            host = self.get_host(url)
+            self.connect(host,port)
+            
+            payload = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
+
+            self.sendall(payload)
+            self.socket.shutdown(socket.SHUT_WR)
+
+            data = self.recvall()
+            print(data)
+
+        except Exception as e:
+            print('An error occured')
+        
+        finally:
+            #always close at the end!
+            self.close()
+
         code = 500
         body = ""
         return HTTPResponse(code, body)
