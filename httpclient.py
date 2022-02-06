@@ -18,6 +18,7 @@
 # Write your own HTTP GET and POST
 # The point is to understand what you have to send and get experience with it
 
+from email import headerregistry
 import sys
 import socket
 import re
@@ -63,13 +64,18 @@ class HTTPClient(object):
         print (f'Socket Connected to {host} on ip {remote_ip}')
 
     def get_code(self, data):
-        return None
+        return int(data.split('\r\n')[0].split(' ')[1])
 
     def get_headers(self,data):
-        return None
+        self.sendall(data)
+        self.socket.shutdown(socket.SHUT_WR)
+        data = self.recvall().strip()
+        print(data)
+        return data
 
     def get_body(self, data):
-        return None
+        body = data.split('\r\n')
+        return body[len(body)-1]
     
     def sendall(self, data):
         print("Sending payload")    
@@ -79,8 +85,6 @@ class HTTPClient(object):
             print ('Send failed')
             sys.exit()
         print("Payload sent successfully")
-
-        # self.socket.sendall(data.encode('utf-8'))
         
     def close(self):
         self.socket.close()
@@ -103,13 +107,11 @@ class HTTPClient(object):
             host = self.get_host(url)
             self.connect(host,port)
             
-            payload = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
+            data = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
 
-            self.sendall(payload)
-            self.socket.shutdown(socket.SHUT_WR)
-
-            data = self.recvall()
-            print(data)
+            headers = self.get_headers(data)
+            code = self.get_code(headers)
+            body = self.get_body(headers)
 
         except Exception as e:
             print('An error occured')
@@ -117,14 +119,27 @@ class HTTPClient(object):
         finally:
             #always close at the end!
             self.close()
-
-        code = 500
-        body = ""
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        try:
+            port = self.get_host_port(url)
+            host = self.get_host(url)
+            self.connect(host,port)
+            
+            data = f'POST / HTTP/1.0\r\nHost: {host}\r\nContent-Length: 0\r\n\r\n'
+
+            headers = self.get_headers(data)
+            code = self.get_code(headers)
+            body = self.get_body(headers)
+
+
+        except Exception as e:
+            print('An error occured')
+        
+        finally:
+            #always close at the end!
+            self.close()
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -132,6 +147,8 @@ class HTTPClient(object):
             return self.POST( url, args )
         else:
             return self.GET( url, args )
+
+    
     
 if __name__ == "__main__":
     client = HTTPClient()
