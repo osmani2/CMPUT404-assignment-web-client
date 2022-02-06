@@ -70,7 +70,6 @@ class HTTPClient(object):
         self.sendall(data)
         self.socket.shutdown(socket.SHUT_WR)
         data = self.recvall().strip()
-        print(data)
         return data
 
     def get_body(self, data):
@@ -104,6 +103,8 @@ class HTTPClient(object):
     def GET(self, url, args=None):
         try:
             port = self.get_host_port(url)
+            if not port:
+                port=80
             host = self.get_host(url)
             self.connect(host,port)
             
@@ -113,13 +114,19 @@ class HTTPClient(object):
             code = self.get_code(headers)
             body = self.get_body(headers)
 
+            #always close at the end!
+            self.close()
+            return HTTPResponse(code, body)
+
         except Exception as e:
             print('An error occured')
+            code = 500
+            body = ""
         
         finally:
             #always close at the end!
             self.close()
-        return HTTPResponse(code, body)
+            return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
         try:
@@ -132,6 +139,7 @@ class HTTPClient(object):
             headers = self.get_headers(data)
             code = self.get_code(headers)
             body = self.get_body(headers)
+
 
 
         except Exception as e:
