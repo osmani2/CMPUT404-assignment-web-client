@@ -26,6 +26,7 @@ import re
 import urllib.parse
 
 from urllib3 import get_host
+import json
 
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
@@ -36,59 +37,82 @@ class HTTPResponse(object):
         self.body = body
 
 class HTTPClient(object):
+    '''
+    Parse url for hosts port if any else uses port 80
+    '''
     def get_host_port(self,url):
-        return urllib.parse.urlparse(url).port
+        port =  urllib.parse.urlparse(url).port
+        if not port:
+            port=80
 
+        return port
+
+    '''
+    Parse url for host
+    '''
     def get_host(self,url):
         return urllib.parse.urlparse(url).hostname
 
+    '''
+    Creates and connects socket to host
+    Taken from Lab 2
+    '''
     def connect(self, host, port):
-        print('Creating socket')
+        # Creat Socket
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except (socket.error, msg):
             print(f'Failed to create socket. Error code: {str(msg[0])} , Error message : {msg[1]}')
             sys.exit()
-        print('Socket created successfully')
 
-        print(f'Getting IP for {host}')
+        # Get hosts IP
         try:
             remote_ip = socket.gethostbyname( host )
         except socket.gaierror:
             print ('Hostname could not be resolved. Exiting')
             sys.exit()
 
-        print (f'Ip address of {host} is {remote_ip}')
-        
+        # Connect socket
         self.socket.connect((host, port))
-        print (f'Socket Connected to {host} on ip {remote_ip}')
 
+    '''
+    Parse header for code
+    '''
     def get_code(self, data):
         return int(data.split('\r\n')[0].split(' ')[1])
 
+    '''
+    Send data and recieve header
+    '''
     def get_headers(self,data):
         self.sendall(data)
         self.socket.shutdown(socket.SHUT_WR)
         data = self.recvall().strip()
         return data
 
+    '''
+    Parse header for body
+    '''
     def get_body(self, data):
         body = data.split('\r\n')
         return body[len(body)-1]
     
-    def sendall(self, data):
-        print("Sending payload")    
+    '''
+    Send all data
+    '''
+    def sendall(self, data):   
         try:
             self.socket.sendall(data.encode('utf-8'))
         except socket.error:
             print ('Send failed')
             sys.exit()
-        print("Payload sent successfully")
-        
+    '''
+    Close socket connection
+    '''   
     def close(self):
         self.socket.close()
 
-    # read everything from the socket
+    '''Read everything from the socket'''
     def recvall(self):
         buffer = bytearray()
         done = False
@@ -100,28 +124,30 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
+    '''
+    Send an HTTP GET request
+    '''
     def GET(self, url, args=None):
         try:
+            # get host and port
             port = self.get_host_port(url)
-            if not port:
-                port=80
             host = self.get_host(url)
+
+            # Connect socket
             self.connect(host,port)
             
+            # Create and send data/request
             data = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
-
             headers = self.get_headers(data)
-            code = self.get_code(headers)
 
-            # Check if body is asking for path
+            #Get the code and body from header
+            code = self.get_code(headers)
             body = self.get_body(headers)
+
+            # Check if body is for the path
             if body=='/':
                 body = urllib.parse.urlparse(url).path
 
-            #always close at the end!
-            self.close()
-            return HTTPResponse(code, body)
-
         except Exception as e:
             print('An error occured')
             code = 500
@@ -130,23 +156,43 @@ class HTTPClient(object):
         finally:
             #always close at the end!
             self.close()
+
+            # Print body to stdout
+            print("BODY RECIEVED!\n",body,"\n")
             return HTTPResponse(code, body)
 
+    '''
+    Send an HTTP POST request
+    '''
     def POST(self, url, args=None):
         try:
             port = self.get_host_port(url)
-            if not port:
-                port=80
             host = self.get_host(url)
             self.connect(host,port)
+
+            body = ''
+            # Use args, if any, for the body
+            if args is not None:
+                post_args = args.copy()
+                for key in post_args:
+                    val =  post_args[key].split('\r\n')
+                    post_args[key]=val
+                body = json.dumps(post_args, indent=2).encode('utf-8')
             
-            data = f'POST / HTTP/1.0\r\nHost: {host}\r\nContent-Length: 0\r\n\r\n'
+            # Get length of body
+            post_length = len(body)
+     
+            # Prep and send data
+            data = f'POST / HTTP/1.0\r\nHost: {host}\r\nContent-Length:{post_length}\r\nContent-Type: application/x-www-form-urlencoded\r\n{body}\r\n\r\n'
 
             headers = self.get_headers(data)
-            code = self.get_code(headers)
-            body = self.get_body(headers)
+            
+            # Recieve Code
 
-            return HTTPResponse(code, body)
+            # Get body returned from header
+            code = self.get_code(headers)
+            if args is None:
+                body = self.get_body(headers)
 
         except Exception as e:
             print('An error occured')
@@ -156,6 +202,9 @@ class HTTPClient(object):
         finally:
             #always close at the end!
             self.close()
+
+            # Print body to stdout
+            print("BODY RECIEVED!\n",body,"\n")
             return HTTPResponse(code, body)
 
 
