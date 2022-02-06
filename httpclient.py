@@ -112,7 +112,11 @@ class HTTPClient(object):
 
             headers = self.get_headers(data)
             code = self.get_code(headers)
+
+            # Check if body is asking for path
             body = self.get_body(headers)
+            if body=='/':
+                body = urllib.parse.urlparse(url).path
 
             #always close at the end!
             self.close()
@@ -131,6 +135,8 @@ class HTTPClient(object):
     def POST(self, url, args=None):
         try:
             port = self.get_host_port(url)
+            if not port:
+                port=80
             host = self.get_host(url)
             self.connect(host,port)
             
@@ -140,15 +146,18 @@ class HTTPClient(object):
             code = self.get_code(headers)
             body = self.get_body(headers)
 
-
+            return HTTPResponse(code, body)
 
         except Exception as e:
             print('An error occured')
+            code = 500
+            body = ""
         
         finally:
             #always close at the end!
             self.close()
-        return HTTPResponse(code, body)
+            return HTTPResponse(code, body)
+
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
