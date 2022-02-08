@@ -38,6 +38,7 @@ class HTTPResponse(object):
         self.body = body
 
 class HTTPClient(object):
+    user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:64.0) Gecko/20100101 Firefox/64.0'
     '''
     Parse url for hosts port if any else uses port 80
     '''
@@ -138,7 +139,7 @@ class HTTPClient(object):
             self.connect(host,port)
             
             # Create and send data/request
-            data = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
+            data = f'GET / HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {self.user_agent}\r\n\r\n'
             headers = self.get_headers(data)
 
             #Get the code and body from header
@@ -184,7 +185,7 @@ class HTTPClient(object):
             post_length = len(body)
      
             # Prep and send data
-            data = f'POST / HTTP/1.0\r\nHost: {host}\r\nContent-Length:{post_length}\r\nContent-Type: application/x-www-form-urlencoded\r\n{body}\r\n\r\n'
+            data = f'POST / HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {self.user_agent}\r\nContent-Length:{post_length}\r\nContent-Type: application/x-www-form-urlencoded\r\n{body}\r\n\r\n'
 
             headers = self.get_headers(data)
             
